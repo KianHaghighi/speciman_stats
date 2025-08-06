@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+:root {
+  --accent-blue: #2563eb;
+  --accent-blue-dark: #1d4ed8;
+  --card-bg: #181818;
+}
+
+.bg-accent-gradient {
+  background: var(--accent-blue);
+}
+
+.text-accent-gradient {
+  color: var(--accent-blue);
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 1rem;
+  box-shadow: 0 0 16px 2px var(--accent-blue);
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 0 32px 4px var(--accent-blue-dark);
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--accent-blue);
+  color: #fff;
+  padding: 0.75em 1.5em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s, background 0.2s;
+}
+
+button:hover {
+  background: var(--accent-blue-dark);
+  filter: brightness(1.1) drop-shadow(0 0 8px var(--accent-blue));
+}
+
+.futuristic-bg {
+  position: relative;
+  min-height: 100vh;
+  background: #000;
+  background-size: 400% 400%;
+  overflow: hidden;
+}
+
+.futuristic-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.05;
+}
+
+/* Remove glitch and all non-blue/white/black colors */ 
