@@ -35,13 +35,16 @@ export const metricsRouter = t.router({
 
   allEntries: protectedProcedure.query(async () => {
     try {
-      return await prisma.entry.findMany({
-        select: {
-          id: true,
-          value: true,
-          metric_id: true,
-          user_id: true,
-          created_at: true,
+      return await prisma.userMetricEntry.findMany({
+        include: {
+          metric: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              higherIsBetter: true,
+            },
+          },
         },
       });
     } catch (error) {
@@ -53,8 +56,35 @@ export const metricsRouter = t.router({
     }
   }),
 
+  userEntries: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      return await prisma.userMetricEntry.findMany({
+        where: {
+          userId: ctx.session!.user.id,
+        },
+        include: {
+          metric: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              higherIsBetter: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      console.error('TRPC Error in metrics.userEntries:', error);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch user entries. Please try again later. Details: ' + (error instanceof Error ? error.message : String(error)),
+      });
+    }
+  }),
+
   byId: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       try {
         const metric = await prisma.metric.findUnique({
@@ -80,13 +110,13 @@ export const metricsRouter = t.router({
     }),
 
   entries: protectedProcedure
-    .input(z.object({ metricId: z.number() }))
+    .input(z.object({ metricId: z.string() }))
     .query(async ({ input }) => {
       try {
-        return await prisma.entry.findMany({
-          where: { metric_id: input.metricId },
+        return await prisma.userMetricEntry.findMany({
+          where: { metricId: input.metricId },
           include: { user: true },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
           take: 50,
         });
       } catch (error) {
@@ -99,7 +129,7 @@ export const metricsRouter = t.router({
     }),
 
   leaderboard: protectedProcedure
-    .input(z.object({ metricId: z.number() }))
+    .input(z.object({ metricId: z.string() }))
     .query(async ({ input }) => {
       try {
         const metric = await prisma.metric.findUnique({
@@ -118,9 +148,9 @@ export const metricsRouter = t.router({
           WITH RankedEntries AS (
             SELECT 
               e.*,
-              ROW_NUMBER() OVER (PARTITION BY e.user_id ORDER BY e.value DESC) as rank
-            FROM "Entry" e
-            WHERE e.metric_id = ${input.metricId}
+              ROW_NUMBER() OVER (PARTITION BY e."userId" ORDER BY e.value DESC) as rank
+            FROM "UserMetricEntry" e
+            WHERE e."metricId" = ${input.metricId}
           )
           SELECT * FROM RankedEntries
           WHERE rank = 1
@@ -130,9 +160,9 @@ export const metricsRouter = t.router({
 
         // Get user details for each entry
         const entriesWithUsers = await Promise.all(
-          (bestEntries as Array<{ user_id: string; [key: string]: unknown }>).map(async (entry) => {
+          (bestEntries as Array<{ userId: string; [key: string]: unknown }>).map(async (entry) => {
             const user = await prisma.user.findUnique({
-              where: { id: entry.user_id },
+              where: { id: entry.userId },
               select: { name: true, image: true },
             });
             return {
@@ -155,7 +185,7 @@ export const metricsRouter = t.router({
 
   addEntry: protectedProcedure
     .input(z.object({
-      metricId: z.number(),
+      metricId: z.string(),
       value: z.number().positive(),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -171,10 +201,10 @@ export const metricsRouter = t.router({
           });
         }
 
-        return await prisma.entry.create({
+        return await prisma.userMetricEntry.create({
           data: {
-            metric_id: input.metricId,
-            user_id: ctx.session!.user.id,
+            metricId: input.metricId,
+            userId: ctx.session!.user.id,
             value: input.value,
           },
         });
@@ -192,7 +222,6 @@ export const metricsRouter = t.router({
     .input(z.object({
       name: z.string().min(1).max(100),
       unit: z.string().min(1).max(20),
-      category: z.string().min(1).max(50),
     }))
     .mutation(async ({ input }) => {
       try {
@@ -200,7 +229,6 @@ export const metricsRouter = t.router({
           data: {
             name: input.name,
             unit: input.unit,
-            category: input.category,
           },
         });
       } catch (error: unknown) {

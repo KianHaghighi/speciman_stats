@@ -111,11 +111,13 @@ export const userRouter = t.router({
       const user = await prisma.user.findUnique({
         where: { id: ctx.session!.user.id },
         include: {
-          entries: {
+          metricEntries: {
             include: {
               metric: true,
             },
           },
+          primaryClass: true,
+          gym: true,
         },
       });
       if (!user) {
@@ -207,12 +209,16 @@ export const userRouter = t.router({
 
   updateProfile: protectedProcedure
     .input(z.object({
+      // Legacy fields (keeping for backward compatibility)
       class: z.string().optional(),
       sex: z.string().optional(),
       age: z.number().optional(),
       heightCm: z.number().optional(),
       weightKg: z.number().optional(),
       bmi: z.number().optional(),
+      // New ELO system fields
+      gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED']).optional(),
+      primaryClassId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -334,11 +340,11 @@ export const userRouter = t.router({
   recalculateAllElos: adminProcedure.mutation(async () => {
     try {
       const users = await prisma.user.findMany();
-      const allEntries = await prisma.entry.findMany();
+      const allEntries = await prisma.userMetricEntry.findMany();
       const metrics = await prisma.metric.findMany();
 
       const updates = users.map(user => {
-        const userEntries = allEntries.filter(e => e.user_id === user.id);
+        const userEntries = allEntries.filter(e => e.userId === user.id);
         const classElos = calculateUserClassElos(userEntries, allEntries, metrics);
         const totalEloRating = totalElo(classElos);
         const tier = tierFromElo(totalEloRating);
@@ -346,13 +352,7 @@ export const userRouter = t.router({
         return prisma.user.update({
           where: { id: user.id },
           data: {
-            eloTitan: classElos[FITNESS_CLASSES.TITAN] || 1500,
-            eloBeast: classElos[FITNESS_CLASSES.BEAST] || 1500,
-            eloBodyweight: classElos[FITNESS_CLASSES.BODYWEIGHT] || 1500,
-            eloSuperAthlete: classElos[FITNESS_CLASSES.SUPER_ATHLETE] || 1500,
-            eloHunterGatherer: classElos[FITNESS_CLASSES.HUNTER_GATHERER] || 1500,
-            eloTotal: totalEloRating,
-            tier,
+            overallElo: totalEloRating,
           },
         });
       });
@@ -367,6 +367,94 @@ export const userRouter = t.router({
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to recalculate Elos',
+      });
+    }
+  }),
+
+  // Get user's metric entries
+  userEntries: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      if (!ctx.session) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No session found. Please sign in again.',
+        });
+      }
+      
+      logger.dbEvent('select', 'userMetricEntry', { operation: 'findMany', userId: ctx.session.user.id });
+      
+      const entries = await prisma.userMetricEntry.findMany({
+        where: { userId: ctx.session.user.id },
+        include: {
+          metric: true,
+          reviewer: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50, // Limit to recent entries
+      });
+      
+      return entries;
+    } catch (error) {
+      logger.error('TRPC Error in user.userEntries', error as Error, { ctx });
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch user entries. Please try again later.',
+      });
+    }
+  }),
+
+  // Get user's overall stats
+  stats: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      if (!ctx.session) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No session found. Please sign in again.',
+        });
+      }
+      
+      logger.dbEvent('select', 'user', { operation: 'stats', userId: ctx.session.user.id });
+      
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        include: {
+          metricEntries: {
+            include: {
+              metric: true,
+            },
+          },
+          primaryClass: true,
+          gym: true,
+        },
+      });
+      
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found',
+        });
+      }
+      
+      // Calculate basic stats
+      const totalEntries = user.metricEntries.length;
+      const approvedEntries = user.metricEntries.filter(e => e.status === 'APPROVED').length;
+      const pendingEntries = user.metricEntries.filter(e => e.status === 'PENDING').length;
+      
+      return {
+        totalEntries,
+        approvedEntries,
+        pendingEntries,
+        overallElo: user.overallElo,
+        primaryClass: user.primaryClass?.name || null,
+        gym: user.gym?.name || null,
+      };
+    } catch (error) {
+      logger.error('TRPC Error in user.stats', error as Error, { ctx });
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch user stats. Please try again later.',
       });
     }
   }),

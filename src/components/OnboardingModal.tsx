@@ -2,34 +2,15 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trpc } from '@/utils/trpc';
 import { signOut, useSession, signIn } from 'next-auth/react';
-import dayjs from 'dayjs';
-
-const classImages = [
-  { key: 'theTitan', base: 'class-titan' },
-  { key: 'theBeast', base: 'class-beast' },
-  { key: 'bodyweightMaster', base: 'class-bodyweight' },
-  { key: 'superAthlete', base: 'class-superathlete' },
-  { key: 'hunterGatherer', base: 'class-hunter' },
-];
-
-// Add unit toggles and conversion helpers
-const convertLbsToKg = (lbs: number) => Math.round(lbs * 0.453592 * 10) / 10;
-const convertFtInToCm = (feet: number, inches: number) => Math.round(((feet * 12) + inches) * 2.54);
+import { CLASSES, CLASS_COLORS, CLASS_DESCRIPTIONS } from '@/config/classes';
 
 export default function OnboardingModal({ open, onFinish }: { open: boolean; onFinish: () => void }) {
   const { data: session, update } = useSession();
   const [step, setStep] = useState(1);
   const [selectedClass, setSelectedClass] = useState('');
-  const [sex, setSex] = useState<'male' | 'female' | ''>('');
-  const [birthDate, setBirthDate] = useState('');
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
-  const [heightUnit, setHeightUnit] = useState<'cm' | 'ftin'>('cm');
-  const [heightFt, setHeightFt] = useState('');
-  const [heightIn, setHeightIn] = useState('');
-  const [weight, setWeight] = useState('');
+  const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | 'UNSPECIFIED'>('UNSPECIFIED');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [height, setHeight] = useState('');
 
   const updateProfile = trpc.user.updateProfile.useMutation({
     onSuccess: async () => {
@@ -87,6 +68,7 @@ export default function OnboardingModal({ open, onFinish }: { open: boolean; onF
                 Sign Out
               </button>
             </div>
+            
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
               {step === 1 && (
@@ -94,250 +76,157 @@ export default function OnboardingModal({ open, onFinish }: { open: boolean; onF
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
+                  className="text-center"
                 >
-                  <h3 className="text-lg font-semibold mb-4 text-white">Choose Your Gender</h3>
-                  <div className="flex gap-4 mb-6 justify-center">
+                  <h3 className="text-3xl font-bold mb-8 text-blue-900">Choose Your Gender</h3>
+                  <div className="grid grid-cols-2 gap-6 max-w-md mx-auto">
                     <button
-                      onClick={() => setSex('male')}
-                      className={`flex-1 p-4 rounded-lg border-4 transition-all text-white text-xl font-bold bg-gradient-to-br from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500 ${
-                        sex === 'male' ? 'border-white shadow-lg scale-105' : 'border-blue-300 opacity-80'
+                      onClick={() => setGender('MALE')}
+                      className={`p-6 rounded-2xl border-2 transition-all ${
+                        gender === 'MALE'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      Male
+                      <div className="text-4xl mb-2">👨</div>
+                      <div className="font-semibold text-gray-800">Male</div>
                     </button>
                     <button
-                      onClick={() => setSex('female')}
-                      className={`flex-1 p-4 rounded-lg border-4 transition-all text-white text-xl font-bold bg-gradient-to-br from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500 ${
-                        sex === 'female' ? 'border-white shadow-lg scale-105' : 'border-blue-300 opacity-80'
+                      onClick={() => setGender('FEMALE')}
+                      className={`p-6 rounded-2xl border-2 transition-all ${
+                        gender === 'FEMALE'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      Female
+                      <div className="text-4xl mb-2">👩</div>
+                      <div className="font-semibold text-gray-800">Female</div>
+                    </button>
+                    <button
+                      onClick={() => setGender('OTHER')}
+                      className={`p-6 rounded-2xl border-2 transition-all col-span-2 ${
+                        gender === 'OTHER'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-4xl mb-2">🌈</div>
+                      <div className="font-semibold text-gray-800">Other</div>
+                    </button>
+                    <button
+                      onClick={() => setGender('UNSPECIFIED')}
+                      className={`p-6 rounded-2xl border-2 transition-all col-span-2 ${
+                        gender === 'UNSPECIFIED'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-4xl mb-2">🤷</div>
+                      <div className="font-semibold text-gray-800">Prefer not to say</div>
                     </button>
                   </div>
+                  
                   <button
                     onClick={() => setStep(2)}
-                    disabled={!sex}
-                    className="mt-6 w-full bg-blue-600 text-white py-2 rounded-lg disabled:opacity-50"
+                    disabled={gender === 'UNSPECIFIED'}
+                    className="mt-8 bg-blue-600 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Next
+                    Continue
                   </button>
                 </motion.div>
               )}
 
               {step === 2 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -50 }}
-                  className="w-full h-full flex flex-col items-center justify-center"
-                >
-                  <h3 className="text-6xl font-extrabold mb-12 text-blue-900 text-center">Choose Your Class</h3>
-                  <div className="w-full flex justify-center">
-                    <div className="hidden md:grid grid-cols-5 gap-12 mb-10">
-                      {classImages.map((c) => (
-                        <button
-                          key={c.key}
-                          onClick={() => setSelectedClass(c.key)}
-                          className={`aspect-square w-80 h-80 rounded-3xl flex items-center justify-center border-4 transition-all bg-gradient-to-br from-blue-500 to-blue-400 hover:from-blue-600 hover:to-blue-500 shadow-xl ${
-                            selectedClass === c.key ? 'border-white shadow-2xl scale-110' : 'border-blue-200 opacity-95'
-                          }`}
-                          style={{ boxShadow: selectedClass === c.key ? '0 8px 32px 0 rgba(0, 112, 244, 0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)' }}
-                        >
-                          <div className="bg-white rounded-2xl p-2 flex items-center justify-center w-full h-full">
-                            <img src={`/${c.base}-${sex === 'male' ? 'm' : 'f'}.png`} alt={c.key} className="w-full h-full object-contain" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    {/* Mobile: horizontal scroll */}
-                    <div className="flex md:hidden gap-10 px-2 overflow-x-auto mb-10">
-                      {classImages.map((c) => (
-                        <button
-                          key={c.key}
-                          onClick={() => setSelectedClass(c.key)}
-                          className={`aspect-square min-w-[240px] min-h-[240px] rounded-3xl flex items-center justify-center border-4 transition-all bg-gradient-to-br from-blue-500 to-blue-400 hover:from-blue-600 hover:to-blue-500 shadow-xl ${
-                            selectedClass === c.key ? 'border-white shadow-2xl scale-110' : 'border-blue-200 opacity-95'
-                          }`}
-                          style={{ boxShadow: selectedClass === c.key ? '0 8px 32px 0 rgba(0, 112, 244, 0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)' }}
-                        >
-                          <div className="bg-white rounded-2xl p-1 flex items-center justify-center w-full h-full">
-                            <img src={`/${c.base}-${sex === 'male' ? 'm' : 'f'}.png`} alt={c.key} className="w-full h-full object-contain" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setStep(3)}
-                    disabled={!selectedClass}
-                    className="mt-12 w-1/2 bg-blue-600 text-white py-3 rounded-xl text-lg font-bold disabled:opacity-50 shadow-lg"
-                  >
-                    Next
-                  </button>
-                </motion.div>
-              )}
-
-              {step === 3 && (
-                <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="max-w-xl mx-auto bg-black/80 rounded-2xl p-10 shadow-2xl flex flex-col gap-8"
+                  className="text-center"
                 >
-                  <h3 className="text-3xl font-extrabold mb-6 text-blue-600 text-center">Enter Your Stats</h3>
-                  {/* Birth Date Picker */}
-                  <div>
-                    <label className="block text-lg font-semibold mb-2">Birth Date</label>
-                    <input
-                      type="date"
-                      value={birthDate}
-                      onChange={e => setBirthDate(e.target.value)}
-                      className="w-full bg-black border border-blue-700 rounded-lg px-4 py-3 text-white text-lg"
-                      max={dayjs().format('YYYY-MM-DD')}
-                    />
-                    {birthDate && (
-                      <div className="text-blue-300 mt-1 text-sm">Age: {dayjs().diff(dayjs(birthDate), 'year')}</div>
-                    )}
+                  <h3 className="text-3xl font-bold mb-8 text-blue-900">Select Your Primary Fitness Class</h3>
+                  <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+                    Choose the fitness discipline that best represents your primary focus. 
+                    You can change this later, and you'll have ELO ratings for all classes.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                    {CLASSES.map((cls, index) => (
+                      <motion.button
+                        key={cls.slug}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        onClick={() => setSelectedClass(cls.slug)}
+                        className={`p-6 rounded-2xl border-2 transition-all ${
+                          selectedClass === cls.slug
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`w-6 h-6 rounded-full ${CLASS_COLORS[cls.slug]} mb-3 mx-auto`}></div>
+                        <div className="font-semibold text-gray-800 text-lg mb-2">{cls.name}</div>
+                        <div className="text-sm text-gray-600">{CLASS_DESCRIPTIONS[cls.slug]}</div>
+                      </motion.button>
+                    ))}
                   </div>
-                  {/* Height Input with Unit Toggle */}
-                  <div>
-                    <label className="block text-lg font-semibold mb-2">Height</label>
-                    <div className="flex gap-2 items-center mb-2">
-                      <button
-                        className={`px-4 py-1 rounded-full font-bold border-2 ${heightUnit === 'cm' ? 'bg-blue-600 text-white border-blue-600' : 'bg-black text-blue-400 border-blue-400'}`}
-                        onClick={() => setHeightUnit('cm')}
-                      >
-                        cm
-                      </button>
-                      <button
-                        className={`px-4 py-1 rounded-full font-bold border-2 ${heightUnit === 'ftin' ? 'bg-blue-600 text-white border-blue-600' : 'bg-black text-blue-400 border-blue-400'}`}
-                        onClick={() => setHeightUnit('ftin')}
-                      >
-                        ft/in
-                      </button>
-                    </div>
-                    {heightUnit === 'cm' ? (
-                      <input
-                        type="number"
-                        value={height}
-                        onChange={e => setHeight(e.target.value)}
-                        className="w-full bg-black border border-blue-700 rounded-lg px-4 py-3 text-white text-lg"
-                        placeholder="Enter your height in cm"
-                      />
-                    ) : (
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          value={heightFt}
-                          onChange={e => setHeightFt(e.target.value)}
-                          className="w-1/2 bg-black border border-blue-700 rounded-lg px-4 py-3 text-white text-lg"
-                          placeholder="Feet"
-                        />
-                        <input
-                          type="number"
-                          value={heightIn}
-                          onChange={e => setHeightIn(e.target.value)}
-                          className="w-1/2 bg-black border border-blue-700 rounded-lg px-4 py-3 text-white text-lg"
-                          placeholder="Inches"
-                        />
-                      </div>
-                    )}
+                  
+                  <div className="mt-8 flex gap-4 justify-center">
+                    <button
+                      onClick={() => setStep(1)}
+                      className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:border-gray-400"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!session?.user?.id) {
+                          setError('Session is invalid or missing user ID. Please sign out and sign in again.');
+                          return;
+                        }
+                        
+                        if (!selectedClass) {
+                          setError('Please select a primary fitness class.');
+                          return;
+                        }
+                        
+                        setLoading(true);
+                        setError('');
+                        
+                        try {
+                          // Find the class ID for the selected slug
+                          const classResponse = await fetch('/api/classes');
+                          if (!classResponse.ok) {
+                            throw new Error('Failed to fetch classes');
+                          }
+                          const classes = await classResponse.json();
+                          const selectedClassData = classes.find((c: any) => c.slug === selectedClass);
+                          
+                          if (!selectedClassData) {
+                            throw new Error('Selected class not found');
+                          }
+                          
+                          await updateProfile.mutateAsync({
+                            gender,
+                            primaryClassId: selectedClassData.id,
+                          });
+                        } catch (err) {
+                          let errMsg = 'Failed to update profile';
+                          if (err instanceof Error && err.message) errMsg += ': ' + err.message;
+                          setError(errMsg);
+                          console.error('Update profile error:', err);
+                        }
+                        
+                        setLoading(false);
+                      }}
+                      disabled={loading || !selectedClass}
+                      className="px-8 py-3 bg-blue-600 text-white rounded-xl text-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? 'Saving...' : 'Complete Profile'}
+                    </button>
                   </div>
-                  {/* Weight Slider with Unit Toggle */}
-                  <div>
-                    <label className="block text-lg font-semibold mb-2">Weight</label>
-                    <div className="flex gap-2 items-center mb-2">
-                      <button
-                        className={`px-4 py-1 rounded-full font-bold border-2 ${weightUnit === 'kg' ? 'bg-blue-600 text-white border-blue-600' : 'bg-black text-blue-400 border-blue-400'}`}
-                        onClick={() => setWeightUnit('kg')}
-                      >
-                        kg
-                      </button>
-                      <button
-                        className={`px-4 py-1 rounded-full font-bold border-2 ${weightUnit === 'lbs' ? 'bg-blue-600 text-white border-blue-600' : 'bg-black text-blue-400 border-blue-400'}`}
-                        onClick={() => setWeightUnit('lbs')}
-                      >
-                        lbs
-                      </button>
-                    </div>
-                    <input
-                      type="range"
-                      min={weightUnit === 'kg' ? 30 : 66}
-                      max={weightUnit === 'kg' ? 200 : 440}
-                      step={weightUnit === 'kg' ? 0.5 : 1}
-                      value={weight}
-                      onChange={e => setWeight(e.target.value)}
-                      className="w-full accent-blue-600"
-                    />
-                    <div className="flex justify-between text-blue-300 text-sm mt-1">
-                      <span>{weightUnit === 'kg' ? '30kg' : '66lbs'}</span>
-                      <span>{weightUnit === 'kg' ? '200kg' : '440lbs'}</span>
-                    </div>
-                    <div className="text-blue-200 text-lg mt-2 font-bold text-center">
-                      {weight} {weightUnit}
-                    </div>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      if (!session?.user?.id) {
-                        setError('Session is invalid or missing user ID. Please sign out and sign in again.');
-                        return;
-                      }
-                      // Validation
-                      const heightCmVal = heightUnit === 'cm' ? Number(height) : convertFtInToCm(Number(heightFt), Number(heightIn));
-                      const weightKgVal = weightUnit === 'kg' ? Number(weight) : convertLbsToKg(Number(weight));
-                      const ageVal = birthDate ? dayjs().diff(dayjs(birthDate), 'year') : '';
-                      let errorMsg = '';
-                      if (!birthDate || isNaN(Number(ageVal)) || Number(ageVal) < 0 || Number(ageVal) > 120) errorMsg = 'Please enter a valid birth date.';
-                      else if (heightUnit === 'cm' && (!height || isNaN(Number(height)) || Number(height) < 80 || Number(height) > 250)) errorMsg = 'Please enter a valid height.';
-                      else if (heightUnit === 'ftin' && (!heightFt || heightIn === '' || isNaN(Number(heightFt)) || isNaN(Number(heightIn)) || Number(heightFt) < 2 || Number(heightFt) > 8 || Number(heightIn) < 0 || Number(heightIn) > 11)) errorMsg = 'Please enter a valid height in feet and inches.';
-                      else if (!weight || isNaN(Number(weight)) || Number(weightKgVal) < 25 || Number(weightKgVal) > 300) errorMsg = 'Please enter a valid weight.';
-                      if (errorMsg) {
-                        setError(errorMsg);
-                        return;
-                      }
-                      // Always recalculate BMI using metric units
-                      const heightM = Number(heightCmVal) / 100;
-                      let bmiValue = Number(weightKgVal) / (heightM * heightM);
-                      if (!bmiValue || isNaN(bmiValue) || !isFinite(bmiValue)) {
-                        setError('Could not calculate BMI. Please check your height and weight.');
-                        return;
-                      }
-                      bmiValue = Number(bmiValue.toFixed(1));
-                      setLoading(true);
-                      setError('');
-                      try {
-                        await updateProfile.mutateAsync({
-                          class: selectedClass,
-                          sex,
-                          age: Number(ageVal),
-                          heightCm: Number(heightCmVal),
-                          weightKg: Number(weightKgVal),
-                          bmi: bmiValue,
-                        });
-                      } catch (err) {
-                        let errMsg = 'Failed to update profile';
-                        if (err instanceof Error && err.message) errMsg += ': ' + err.message;
-                        errMsg += `\nclass: ${selectedClass}, sex: ${sex}, age: ${Number(ageVal)}, heightCm: ${Number(heightCmVal)}, weightKg: ${Number(weightKgVal)}, bmi: ${bmiValue}`;
-                        setError(errMsg);
-                        console.error('Update profile error:', err, {
-                          class: selectedClass,
-                          sex,
-                          age: Number(ageVal),
-                          heightCm: Number(heightCmVal),
-                          weightKg: Number(weightKgVal),
-                          bmi: bmiValue,
-                        });
-                      }
-                      setLoading(false);
-                    }}
-                    disabled={loading || !session?.user?.id}
-                    className="mt-8 w-full bg-blue-600 text-white py-4 rounded-xl text-2xl font-bold disabled:opacity-50 shadow-lg"
-                  >
-                    {loading ? 'Saving...' : 'Finish'}
-                  </button>
+                  
                   {error && (
-                    <div className="mt-2 text-red-500 text-sm text-center">
+                    <div className="mt-4 text-red-500 text-center">
                       {error}
                       {error.includes('sign out') && (
                         <button

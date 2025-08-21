@@ -1,6 +1,7 @@
 import { trpc } from '@/utils/trpc';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
+import ClientOnly from '@/components/ClientOnly';
 
 interface User {
   id: string;
@@ -33,8 +34,12 @@ export default function SpecimensPage() {
             transition={{ delay: idx * 0.05 }}
           >
             <img src={user.image || ''} alt={user.name || 'User'} className="w-24 h-24 rounded-full border-4 border-blue-500 mb-4 shadow-lg" />
-            <div className="text-xl font-bold text-white mb-1">{user.name}</div>
-            <div className="text-blue-400 text-sm">{user.email}</div>
+            <ClientOnly>
+              <div className="text-xl font-bold text-white mb-1">{user.name}</div>
+            </ClientOnly>
+            <ClientOnly>
+              <div className="text-blue-400 text-sm">{user.email}</div>
+            </ClientOnly>
           </motion.div>
         ))}
       </div>

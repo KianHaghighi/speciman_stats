@@ -67,9 +67,9 @@ export function Navbar() {
                 Specimens
               </Link>
               <Link
-                href="/specimen/me"
+                href="/my-specimen"
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                  isActive('/specimen/me')
+                  isActive('/my-specimen')
                     ? 'border-blue-500 text-gray-900'
                     : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                 }`}

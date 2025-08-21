@@ -1,11 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNSPECIFIED
+}
+
+enum EntryStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  ENTRY_REVIEWED
+  ELO_UPDATE
+  ACHIEVEMENT
+  SYSTEM
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
 }
 
 model Account {
@@ -14,14 +49,15 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -34,36 +70,6 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model User {
-  id            String    @id @default(cuid())
-  email         String?   @unique
-  emailVerified DateTime?
-  password      String?   // For email/password authentication
-  image         String?
-  name          String?
-  class         String?   // e.g. 'beast', 'mrOlympia', etc.
-  sex           String?   // 'M' | 'F'
-  age           Int?
-  heightCm      Int?
-  weightKg      Int?
-  bmi           Float?
-  role          String?   @default("user") // "user" | "admin"
-  
-  // Elo ratings for each class
-  eloTitan      Int?      @default(1500)
-  eloBeast      Int?      @default(1500)
-  eloBodyweight Int?      @default(1500)
-  eloSuperAthlete Int?    @default(1500)
-  eloHunterGatherer Int?  @default(1500)
-  eloTotal      Int?      @default(1500)
-  tier          String?   @default("Bronze")
-  
-  accounts      Account[]
-  entries       Entry[]
-  sessions      Session[]
-  videos        Video[]
-}
-
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -72,33 +78,179 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  displayName   String?
+  email         String?  @unique
+  image         String?
+  gender        Gender   @default(UNSPECIFIED)
+  dateOfBirth   DateTime?
+  primaryClassId String?
+  primaryClass   Class?  @relation("UserPrimaryClass", fields: [primaryClassId], references: [id])
+  gymId         String?
+  gym           Gym?    @relation(fields: [gymId], references: [id])
+  overallElo    Float    @default(1000)
+  classElos     UserClassElo[]
+  metricEntries UserMetricEntry[]
+  reviewedEntries UserMetricEntry[] @relation("EntryReviewer")
+  notifications Notification[]
+  friendshipsAsRequester Friendship[] @relation("FriendshipRequester")
+  friendshipsAsAddressee Friendship[] @relation("FriendshipAddressee")
+  eloEvents    EloEvent[]
+  prefs        UserPrefs?
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([gymId])
+}
+
+model Gym {
+  id        String   @id @default(cuid())
+  name      String
+  street    String?
+  city      String?
+  state     String?
+  country   String?
+  lat       Float?
+  lng       Float?
+  users     User[]
+  createdAt DateTime @default(now())
+
+  @@index([city, state, country])
+  @@index([lat, lng])
+}
+
+model Class {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  metrics   Metric[]
+  users     UserClassElo[]
+  primaryUsers User[] @relation("UserPrimaryClass")
+  eloEvents EloEvent[]
+  createdAt DateTime @default(now())
+}
+
 model Metric {
-  id      Int     @id @default(autoincrement())
-  name    String  @unique
-  unit    String
-  category String // 'The Titan', 'The Beast', 'Bodyweight Master', 'Super Athlete', 'Hunter Gatherer'
-  entries Entry[]
-  videos  Video[]
+  id             String  @id @default(cuid())
+  classId        String
+  class          Class   @relation(fields: [classId], references: [id])
+  name           String
+  slug           String  @unique
+  unit           String
+  higherIsBetter Boolean @default(true)
+  weight         Float   @default(1)
+  group          String?
+  rankBreakpoints Json?
+  createdAt      DateTime @default(now())
+  entries        UserMetricEntry[]
 }
 
-model Entry {
-  id         String   @id @default(uuid())
-  user_id    String
-  metric_id  Int
-  value      Float
-  created_at DateTime @default(now())
-  status     String   @default("approved") // "pending" | "approved" | "rejected"
-  metric     Metric   @relation(fields: [metric_id], references: [id])
-  user       User     @relation(fields: [user_id], references: [id])
+model UserClassElo {
+  id        String  @id @default(cuid())
+  userId    String
+  classId   String
+  elo       Float   @default(1000)
+  updatedAt DateTime @updatedAt
+  user      User   @relation(fields: [userId], references: [id])
+  class     Class  @relation(fields: [classId], references: [id])
+
+  @@unique([userId, classId])
 }
 
-model Video {
-  id         String   @id @default(uuid())
-  userId     String
-  metricId   Int
-  url        String
-  status     String   @default("pending") // "pending" | "approved" | "rejected"
+model UserMetricEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  metricId     String
+  value        Float
+  notes        String?
+  status       EntryStatus @default(PENDING)
+  videoUrl     String?
+  reviewNotes  String?
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewer     User?   @relation("EntryReviewer", fields: [reviewedById], references: [id])
+  createdAt    DateTime @default(now())
+  user         User    @relation(fields: [userId], references: [id])
+  metric       Metric  @relation(fields: [metricId], references: [id])
+  reviewToken  ReviewToken?
+
+  @@index([userId, metricId, createdAt])
+  @@index([status])
+  @@index([reviewedById])
+}
+
+model ReviewToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  entryId   String   @unique
+  entry     UserMetricEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+  @@index([type])
+}
+
+model Friendship {
+  id           String        @id @default(cuid())
+  requesterId  String
+  addresseeId  String
+  status       FriendshipStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  requester    User          @relation("FriendshipRequester", fields: [requesterId], references: [id])
+  addressee    User          @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId, status])
+  @@index([addresseeId, status])
+}
+
+model UserPrefs {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  units      UnitSystem @default(METRIC)
+  language   String   @default("en")
+  sfxEnabled Boolean  @default(true)
+  sfxVolume  Float    @default(0.6)
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  metric     Metric   @relation(fields: [metricId], references: [id])
+}
+
+model EloEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classId   String?
+  class     Class?   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  eventType String
+  oldValue  Float
+  newValue  Float
+  change    Float
+  metadata  String?  // JSON string
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([classId])
+  @@index([createdAt])
+  @@index([eventType])
 }
