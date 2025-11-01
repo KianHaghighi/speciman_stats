@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -306,10 +307,14 @@ async function main() {
 
   console.log('📊 Created placeholder metrics for each class');
 
+  // Hash password for test users
+  const hashedPassword = await bcrypt.hash('Admin123!', 12);
+
   // Create admin/test user with rich data
   const adminUser = await prisma.user.create({
     data: {
       email: process.env.ADMIN_EMAIL || 'michael@natxsocial.com',
+      password: hashedPassword,
       displayName: 'Admin User',
       name: 'Administrator',
       gender: 'MALE',

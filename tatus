@@ -1,0 +1,29 @@
+[1mdiff --git a/src/pages/api/auth/register.ts b/src/pages/api/auth/register.ts[m
+[1mindex 5bab5af..7c7247a 100644[m
+[1m--- a/src/pages/api/auth/register.ts[m
+[1m+++ b/src/pages/api/auth/register.ts[m
+[36m@@ -3,7 +3,6 @@[m [mimport { prisma } from '@/utils/prisma';[m
+ import { logger } from '@/utils/logger';[m
+ import bcrypt from 'bcrypt';[m
+ import { z } from 'zod';[m
+[31m-import type { Prisma } from '@prisma/client';[m
+ [m
+ const registerSchema = z.object({[m
+   email: z.string().email('Invalid email address'),[m
+[36m@@ -37,14 +36,8 @@[m [mexport default async function handler(req: NextApiRequest, res: NextApiResponse)[m
+         email,[m
+         password: hashedPassword,[m
+         name,[m
+[31m-        eloTitan: 1500,[m
+[31m-        eloBeast: 1500,[m
+[31m-        eloBodyweight: 1500,[m
+[31m-        eloSuperAthlete: 1500,[m
+[31m-        eloHunterGatherer: 1500,[m
+[31m-        eloTotal: 1500,[m
+[31m-        tier: 'Bronze',[m
+[31m-      } as Prisma.UserUncheckedCreateInput,[m
+[32m+[m[32m        overallElo: 1000,[m
+[32m+[m[32m      },[m
+     });[m
+ [m
+     logger.authEvent('user_registered', user.id, { email, provider: 'credentials' });[m

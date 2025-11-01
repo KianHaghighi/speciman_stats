@@ -3,7 +3,6 @@ import { prisma } from '@/utils/prisma';
 import { logger } from '@/utils/logger';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -37,14 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email,
         password: hashedPassword,
         name,
-        eloTitan: 1500,
-        eloBeast: 1500,
-        eloBodyweight: 1500,
-        eloSuperAthlete: 1500,
-        eloHunterGatherer: 1500,
-        eloTotal: 1500,
-        tier: 'Bronze',
-      } as Prisma.UserUncheckedCreateInput,
+        overallElo: 1000,
+      },
     });
 
     logger.authEvent('user_registered', user.id, { email, provider: 'credentials' });

@@ -1,0 +1,11 @@
+warning: in the working copy of 'prisma/schema.prisma', LF will be replaced by CRLF the next time Git touches it
+ package-lock.json                   | 575 [32m+++++++++++++++++++++++++++[m[31m---------[m
+ package.json                        |   4 [32m+[m[31m-[m
+ prisma/schema.prisma                |   1 [32m+[m
+ prisma/seed.ts                      |   5 [32m+[m
+ src/components/AppShell.tsx         |   2 [32m+[m[31m-[m
+ src/pages/api/auth/[...nextauth].ts |  15 [32m+[m[31m-[m
+ src/pages/api/auth/register.ts      |  11 [32m+[m[31m-[m
+ src/pages/auth/login.tsx            |  33 [32m++[m[31m-[m
+ src/pages/auth/signup.tsx           |  24 [32m+[m[31m-[m
+ 9 files changed, 510 insertions(+), 160 deletions(-)
