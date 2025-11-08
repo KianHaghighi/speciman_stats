@@ -58,7 +58,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Registration error', error as Error);
+    
+    // In development, show more details
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Registration Error Details:', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        details: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+    
     res.status(500).json({ error: 'Internal server error' });
   }
 } 
