@@ -307,14 +307,15 @@ async function main() {
 
   console.log('📊 Created placeholder metrics for each class');
 
-  // Hash password for test users
-  const hashedPassword = await bcrypt.hash('Admin123!', 12);
+  // Hash passwords for test users
+  const adminPassword = await bcrypt.hash('admin123', 12);
+  const testPassword = await bcrypt.hash('password123', 12);
 
-  // Create admin/test user with rich data
+  // Create admin user
   const adminUser = await prisma.user.create({
     data: {
-      email: process.env.ADMIN_EMAIL || 'michael@natxsocial.com',
-      password: hashedPassword,
+      email: 'admin@specimanstats.com',
+      password: adminPassword,
       displayName: 'Admin User',
       name: 'Administrator',
       gender: 'MALE',
@@ -325,9 +326,11 @@ async function main() {
     },
   });
 
+  // Create test user with password
   const testUser = await prisma.user.create({
     data: {
-      email: 'test@specimenstats.com',
+      email: 'test@gmail.com',
+      password: testPassword,
       displayName: 'Test User',
       name: 'Test User',
       gender: 'MALE',
@@ -563,17 +566,13 @@ async function main() {
   console.log(`🤝 Friendships: ${friendshipCount}`);
   console.log(`🔔 Notifications: ${notificationCount}`);
   console.log('\n✅ Database seeding completed successfully!');
-  
-  // Dev log line
-  if (process.env.NODE_ENV === 'development') {
-    console.log(JSON.stringify({
-      level: 'info',
-      scope: 'dev',
-      msg: 'Seeded admin',
-      email: adminUser.email,
-      password: 'Admin123!'
-    }));
-  }
+  console.log('\n🔐 Login Credentials:');
+  console.log('Admin User:');
+  console.log('  Email: admin@specimanstats.com');
+  console.log('  Password: admin123');
+  console.log('\nTest User:');
+  console.log('  Email: test@gmail.com');
+  console.log('  Password: password123');
 }
 
 main()
