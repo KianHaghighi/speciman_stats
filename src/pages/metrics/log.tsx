@@ -1,13 +1,13 @@
 import { GetServerSideProps } from "next";
 import Head from "next/head";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]";
 import AppShell from "@/components/layout/AppShell";
 import { trpc } from "@/utils/trpc";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Search, Video, FileText, TrendingUp, CheckCircle, AlertCircle } from "lucide-react";
+import { Search, Video, FileText, TrendingUp, CheckCircle, AlertCircle, X } from "lucide-react";
 
 // Zod schema for metric logging
 const metricLogSchema = z.object({
@@ -44,17 +44,51 @@ export default function MetricsLog({ user }: Props) {
   const [showConfetti, setShowConfetti] = useState(false);
 
   // tRPC queries
-  const { data: metrics = [] } = trpc.metrics.all.useQuery();
+  const { data: metrics = [], isLoading: isLoadingMetrics, error: metricsError } = trpc.metrics.all.useQuery();
   const { data: userData } = trpc.user.me.useQuery();
   
+  // Debug: Log metrics data
+  useEffect(() => {
+    if (metrics && metrics.length > 0) {
+      console.log('Metrics loaded:', metrics.length, 'metrics');
+      console.log('Sample metric:', metrics[0]);
+    } else if (!isLoadingMetrics) {
+      console.log('No metrics found or metrics array is empty');
+    }
+    if (metricsError) {
+      console.error('Metrics error:', metricsError);
+    }
+  }, [metrics, isLoadingMetrics, metricsError]);
 
   // Filter metrics based on search
-  const filteredMetrics = searchQuery 
-    ? metrics.filter((metric: any) =>
-        metric.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (metric.group && metric.group.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : [];
+  const filteredMetrics = useMemo(() => {
+    if (!searchQuery || !metrics || metrics.length === 0) {
+      return [];
+    }
+    
+    const searchLower = searchQuery.toLowerCase().trim();
+    if (searchLower.length === 0) {
+      return [];
+    }
+    
+    return metrics.filter((metric: any) => {
+      if (!metric) return false;
+      
+      // Check name
+      const name = metric.name || '';
+      const nameMatch = name.toLowerCase().includes(searchLower);
+      
+      // Check group if it exists
+      const group = metric.group || '';
+      const groupMatch = group && group.toLowerCase().includes(searchLower);
+      
+      // Check slug if it exists
+      const slug = metric.slug || '';
+      const slugMatch = slug && slug.toLowerCase().includes(searchLower);
+      
+      return nameMatch || groupMatch || slugMatch;
+    });
+  }, [searchQuery, metrics]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,51 +236,117 @@ export default function MetricsLog({ user }: Props) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Metric *
               </label>
+              {isLoadingMetrics && (
+                <div className="mb-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                  Loading metrics...
+                </div>
+              )}
+              {metricsError && (
+                <div className="mb-2 p-3 bg-red-50 rounded-lg text-sm text-red-700 border border-red-200">
+                  <div className="font-semibold mb-1">Error loading metrics</div>
+                  <div className="text-xs text-red-600">
+                    {metricsError.message || 'Unknown error occurred. Please refresh the page.'}
+                  </div>
+                  {process.env.NODE_ENV === 'development' && (
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer text-red-500">Show error details</summary>
+                      <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto text-xs">
+                        {JSON.stringify(metricsError, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              )}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search metrics..."
+                  placeholder={isLoadingMetrics ? "Loading metrics..." : "Type to search metrics (e.g., 'bench', 'squat')..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  disabled={isLoadingMetrics}
+                  className={`w-full pl-10 ${searchQuery ? 'pr-10' : 'pr-4'} py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     !formData.metricId && searchQuery === "" ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                  }`}
+                  } ${isLoadingMetrics ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
+                {searchQuery && !isLoadingMetrics && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFormData(prev => ({ ...prev, metricId: "" }));
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
               </div>
-              {!formData.metricId && searchQuery === "" && (
+              {!formData.metricId && searchQuery === "" && !isLoadingMetrics && (
                 <p className="mt-1 text-sm text-red-600">Please search and select a metric to continue</p>
+              )}
+              {searchQuery && !isLoadingMetrics && (
+                <p className="mt-1 text-sm text-gray-500">
+                  {filteredMetrics.length > 0 
+                    ? `Found ${filteredMetrics.length} metric${filteredMetrics.length !== 1 ? 's' : ''}` 
+                    : searchQuery.length > 0 
+                    ? `No metrics found. Try a different search term. (Total metrics: ${metrics.length})` 
+                    : 'Start typing to search...'}
+                </p>
+              )}
+              
+              {/* Debug info in development */}
+              {process.env.NODE_ENV === 'development' && !isLoadingMetrics && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Debug: {metrics.length} metrics loaded, search: "{searchQuery}", filtered: {filteredMetrics.length}
+                </p>
               )}
               
               {/* Metric Options */}
-              {searchQuery && (
-                <div className="mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+              {searchQuery.trim().length > 0 && !isLoadingMetrics && (
+                <div className="mt-2 max-h-60 overflow-y-auto border border-gray-300 rounded-lg shadow-lg bg-white relative z-50">
                   {filteredMetrics.length > 0 ? (
-                    filteredMetrics.map((metric: any) => (
-                      <button
-                        key={metric.id}
-                        type="button"
-                        onClick={() => handleMetricSelect(metric.id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                          formData.metricId === metric.id ? 'bg-blue-50 border-blue-200' : ''
-                        }`}
-                      >
-                        <div className="font-medium text-gray-900">{metric.name}</div>
-                        <div className="text-sm text-gray-500">{metric.group || metric.unit}</div>
-                      </button>
-                    ))
+                    <div className="divide-y divide-gray-200">
+                      {filteredMetrics.map((metric: any) => (
+                        <button
+                          key={metric.id}
+                          type="button"
+                          onClick={() => handleMetricSelect(metric.id)}
+                          className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors ${
+                            formData.metricId === metric.id ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+                          }`}
+                        >
+                          <div className="font-medium text-gray-900">{metric.name || 'Unnamed Metric'}</div>
+                          {metric.group && (
+                            <div className="text-sm text-gray-500 mt-1">{metric.group}</div>
+                          )}
+                          {metric.unit && !metric.group && (
+                            <div className="text-sm text-gray-500 mt-1">Unit: {metric.unit}</div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   ) : (
-                    <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                      No metrics found. Try a different search term.
+                    <div className="px-4 py-6 text-sm text-gray-500 text-center">
+                      <div className="mb-2">No metrics found matching "{searchQuery}"</div>
+                      <div className="text-xs text-gray-400">
+                        Try searching for: bench, squat, deadlift, etc.
+                      </div>
+                      {metrics.length === 0 && (
+                        <div className="mt-3 text-xs text-red-500 font-medium">
+                          ⚠️ No metrics available in database. Please check your database connection.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
               
               {formData.metricId && (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-sm text-blue-800">
-                    Selected: <span className="font-medium">{metrics.find((m: any) => m.id === formData.metricId)?.name}</span>
+                    <span className="font-semibold">Selected:</span> <span className="font-medium">{metrics.find((m: any) => m.id === formData.metricId)?.name}</span>
                   </div>
                 </div>
               )}
