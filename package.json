@@ -10,6 +10,7 @@
     "test": "vitest",
     "test:run": "vitest --run",
     "test:unit": "vitest --run __tests__",
+    "test:integration": "vitest --run __tests__/integration",
     "test:fast": "vitest --run __tests__/config/*.test.ts __tests__/lib/elo/math.test.ts",
     "test:e2e": "playwright test",
     "smoke": "node scripts/smoke.mjs",
