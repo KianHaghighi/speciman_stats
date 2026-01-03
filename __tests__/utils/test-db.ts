@@ -247,36 +247,48 @@ export class TestDatabase {
 /**
  * Helper to create minimal required data for testing
  * This simulates what would happen in a fresh production environment
+ * Uses upsert to make it idempotent - safe to call multiple times
  */
 export async function createMinimalTestData(prisma: PrismaClient) {
   // Create the 5 required classes (these are required by the schema)
+  // Use upsert to make this function idempotent
   const classes = await Promise.all([
-    prisma.class.create({
-      data: {
+    prisma.class.upsert({
+      where: { slug: 'titan' },
+      update: {},
+      create: {
         slug: 'titan',
         name: 'The Titan',
       },
     }),
-    prisma.class.create({
-      data: {
+    prisma.class.upsert({
+      where: { slug: 'beast' },
+      update: {},
+      create: {
         slug: 'beast',
         name: 'The Beast',
       },
     }),
-    prisma.class.create({
-      data: {
+    prisma.class.upsert({
+      where: { slug: 'bodyweight_master' },
+      update: {},
+      create: {
         slug: 'bodyweight_master',
         name: 'The Body Weight Master',
       },
     }),
-    prisma.class.create({
-      data: {
+    prisma.class.upsert({
+      where: { slug: 'hunter_gatherer' },
+      update: {},
+      create: {
         slug: 'hunter_gatherer',
         name: 'The Hunter Gatherer',
       },
     }),
-    prisma.class.create({
-      data: {
+    prisma.class.upsert({
+      where: { slug: 'super_athlete' },
+      update: {},
+      create: {
         slug: 'super_athlete',
         name: 'The Super Athlete',
       },
