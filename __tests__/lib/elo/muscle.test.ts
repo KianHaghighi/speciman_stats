@@ -36,7 +36,7 @@ describe('Muscle ELO System', () => {
         expect(muscle).toHaveProperty('svgPath');
         expect(muscle).toHaveProperty('tooltipPosition');
         expect(muscle).toHaveProperty('relatedMetrics');
-        expect(Array.isArray(muscle.relatedMetrics)).toBe(true);
+        expect(Array.isArray(muscle.relatedMetrics)).toBe(true); 
         
         // Check tooltip position structure
         expect(muscle.tooltipPosition).toHaveProperty('x');
