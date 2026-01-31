@@ -83,6 +83,7 @@ model User {
   name          String?
   displayName   String?
   email         String?  @unique
+  password      String?  // For credentials auth
   image         String?
   gender        Gender   @default(UNSPECIFIED)
   dateOfBirth   DateTime?

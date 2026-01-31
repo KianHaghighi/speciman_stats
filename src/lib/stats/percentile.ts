@@ -29,40 +29,98 @@ export function calculatePercentile(
   // Sort values if not already sorted
   const sortedValues = [...values].sort((a, b) => a - b);
   
-  // Find position using binary search
-  let left = 0;
-  let right = sortedValues.length - 1;
-  let position = 0;
-
-  while (left <= right) {
-    const mid = Math.floor((left + right) / 2);
+  // Find the position and handle interpolation
+  let percentile = 0;
+  let rank = 0;
+  
+  if (higherIsBetter) {
+    // Count values <= targetValue
+    let left = 0;
+    let right = sortedValues.length - 1;
+    let count = 0;
+    let exactMatch = false;
+    let lowerBound = -Infinity;
+    let upperBound = Infinity;
     
-    if (higherIsBetter) {
+    // Find position using binary search
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
       if (sortedValues[mid] <= targetValue) {
-        position = mid + 1;
+        count = mid + 1;
+        lowerBound = sortedValues[mid];
+        if (sortedValues[mid] === targetValue) {
+          exactMatch = true;
+        }
         left = mid + 1;
       } else {
-        right = mid - 1;
-      }
-    } else {
-      if (sortedValues[mid] >= targetValue) {
-        position = mid + 1;
-        left = mid + 1;
-      } else {
+        if (mid === 0 || sortedValues[mid - 1] <= targetValue) {
+          upperBound = sortedValues[mid];
+        }
         right = mid - 1;
       }
     }
+    
+    rank = count;
+    
+    // If value is between two data points, interpolate
+    if (!exactMatch && lowerBound !== -Infinity && upperBound !== Infinity) {
+      // Linear interpolation between lower and upper bounds
+      const lowerPercentile = (count / sortedValues.length) * 100;
+      const upperPercentile = ((count + 1) / sortedValues.length) * 100;
+      const interpolationFactor = (targetValue - lowerBound) / (upperBound - lowerBound);
+      percentile = lowerPercentile + (upperPercentile - lowerPercentile) * interpolationFactor;
+    } else {
+      percentile = (count / sortedValues.length) * 100;
+    }
+  } else {
+    // Count values >= targetValue (lower is better, so higher values are worse)
+    let left = 0;
+    let right = sortedValues.length - 1;
+    let firstIndex = sortedValues.length;
+    let exactMatch = false;
+    let lowerBound = -Infinity;
+    let upperBound = Infinity;
+    
+    // Find leftmost position where value >= targetValue
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      if (sortedValues[mid] >= targetValue) {
+        firstIndex = mid;
+        upperBound = sortedValues[mid];
+        if (sortedValues[mid] === targetValue) {
+          exactMatch = true;
+        }
+        right = mid - 1;
+      } else {
+        if (mid === sortedValues.length - 1 || sortedValues[mid + 1] >= targetValue) {
+          lowerBound = sortedValues[mid];
+        }
+        left = mid + 1;
+      }
+    }
+    
+    // Count from firstIndex to end (values that are worse or equal)
+    const count = sortedValues.length - firstIndex;
+    rank = count;
+    
+    // If value is between two data points, interpolate
+    if (!exactMatch && lowerBound !== -Infinity && upperBound !== Infinity) {
+      // For lower is better, interpolation is inverted
+      const upperPercentile = (count / sortedValues.length) * 100;
+      const lowerPercentile = ((count + 1) / sortedValues.length) * 100;
+      const interpolationFactor = (targetValue - lowerBound) / (upperBound - lowerBound);
+      percentile = lowerPercentile + (upperPercentile - lowerPercentile) * interpolationFactor;
+    } else {
+      percentile = (count / sortedValues.length) * 100;
+    }
   }
-
-  // Calculate percentile (0-100)
-  const percentile = (position / sortedValues.length) * 100;
   
   // Ensure percentile is within bounds
   const clampedPercentile = Math.max(0, Math.min(100, percentile));
   
   return {
     percentile: clampedPercentile,
-    rank: position,
+    rank: rank, // 1-based rank (number of values that are better/equal)
     totalCount: sortedValues.length,
     value: targetValue,
   };

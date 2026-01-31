@@ -1,14 +1,13 @@
 import { GetServerSideProps } from "next";
 import Head from "next/head";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../api/auth/[...nextauth]";
 import AppShell from "@/components/layout/AppShell";
-import { useToast } from "@/components/ui/Toaster";
 import { trpc } from "@/utils/trpc";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Search, Video, FileText, TrendingUp, CheckCircle, AlertCircle } from "lucide-react";
+import { Search, Video, FileText, TrendingUp, CheckCircle, AlertCircle, X } from "lucide-react";
 
 // Zod schema for metric logging
 const metricLogSchema = z.object({
@@ -33,7 +32,6 @@ export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
 };
 
 export default function MetricsLog({ user }: Props) {
-  const { toast } = useToast();
   const [formData, setFormData] = useState<MetricLogForm>({
     metricId: "",
     value: 0,
@@ -45,81 +43,52 @@ export default function MetricsLog({ user }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  // tRPC queries and mutations
-  const { data: metrics = [] } = trpc.metrics.all.useQuery();
+  // tRPC queries
+  const { data: metrics = [], isLoading: isLoadingMetrics, error: metricsError } = trpc.metrics.all.useQuery();
   const { data: userData } = trpc.user.me.useQuery();
-  const utils = trpc.useContext();
   
-  const logMetricMutation = trpc.metrics.log.useMutation({
-    onMutate: async (newMetric) => {
-      // Cancel outgoing refetches
-      await utils.metrics.userEntries.cancel();
-      
-      // Snapshot previous value
-      const previousEntries = utils.metrics.userEntries.getData();
-      
-      // Optimistically update
-      utils.metrics.userEntries.setData(undefined, (old) => {
-        if (!old) return old;
-        return [
-          {
-            id: `temp-${Date.now()}`,
-            value: newMetric.value,
-            unit: newMetric.unit,
-            status: newMetric.value >= 1000 ? "PENDING" : "APPROVED", // Auto PENDING for Platinum+
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            userId: userData?.id || "",
-            metricId: newMetric.metricId,
-            reviewerId: null,
-            reviewNotes: null,
-            metric: metrics.find(m => m.id === newMetric.metricId)!,
-            reviewer: null,
-          },
-          ...old,
-        ];
-      });
-      
-      return { previousEntries };
-    },
-    onError: (err, newMetric, context) => {
-      // Rollback on error
-      if (context?.previousEntries) {
-        utils.metrics.userEntries.setData(undefined, context.previousEntries);
-      }
-      toast({
-        title: "Error logging metric",
-        description: err.message,
-        type: "error",
-      });
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Metric logged successfully!",
-        description: `Your ${data.metric.name} has been recorded.`,
-        type: "success",
-      });
-      
-      // Show confetti for rank changes
-      if (data.status === "APPROVED") {
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 3000);
-      }
-      
-      // Refetch data
-      utils.metrics.userEntries.invalidate();
-      utils.user.me.invalidate();
-    },
-    onSettled: () => {
-      setIsSubmitting(false);
-    },
-  });
+  // Debug: Log metrics data
+  useEffect(() => {
+    if (metrics && metrics.length > 0) {
+      console.log('Metrics loaded:', metrics.length, 'metrics');
+      console.log('Sample metric:', metrics[0]);
+    } else if (!isLoadingMetrics) {
+      console.log('No metrics found or metrics array is empty');
+    }
+    if (metricsError) {
+      console.error('Metrics error:', metricsError);
+    }
+  }, [metrics, isLoadingMetrics, metricsError]);
 
   // Filter metrics based on search
-  const filteredMetrics = metrics.filter(metric =>
-    metric.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    metric.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredMetrics = useMemo(() => {
+    if (!searchQuery || !metrics || metrics.length === 0) {
+      return [];
+    }
+    
+    const searchLower = searchQuery.toLowerCase().trim();
+    if (searchLower.length === 0) {
+      return [];
+    }
+    
+    return metrics.filter((metric: any) => {
+      if (!metric) return false;
+      
+      // Check name
+      const name = metric.name || '';
+      const nameMatch = name.toLowerCase().includes(searchLower);
+      
+      // Check group if it exists
+      const group = metric.group || '';
+      const groupMatch = group && group.toLowerCase().includes(searchLower);
+      
+      // Check slug if it exists
+      const slug = metric.slug || '';
+      const slugMatch = slug && slug.toLowerCase().includes(searchLower);
+      
+      return nameMatch || groupMatch || slugMatch;
+    });
+  }, [searchQuery, metrics]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,11 +97,41 @@ export default function MetricsLog({ user }: Props) {
       const validatedData = metricLogSchema.parse(formData);
       setIsSubmitting(true);
       
-      await logMetricMutation.mutateAsync({
-        ...validatedData,
-        videoUrl: validatedData.videoUrl || undefined,
-        notes: validatedData.notes || undefined,
+      console.log('Submitting metric:', {
+        metricId: validatedData.metricId,
+        value: validatedData.value,
+        notes: validatedData.notes,
       });
+      
+      const response = await fetch('/api/metrics/add-entry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          metricId: validatedData.metricId,
+          value: validatedData.value,
+          notes: validatedData.notes || undefined,
+        }),
+      });
+
+      console.log('Response status:', response.status);
+      const result = await response.json();
+      console.log('Response body:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to log metric');
+      }
+
+      // Show success
+      const metricName = metrics.find((m: any) => m.id === formData.metricId)?.name || 'Metric';
+      alert(`${metricName} logged successfully!`);
+      
+      // Show confetti for improvements
+      if (result.hasImprovement) {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+      }
       
       // Reset form
       setFormData({
@@ -144,25 +143,31 @@ export default function MetricsLog({ user }: Props) {
       });
       setSearchQuery("");
       
+      // Reload the page to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
     } catch (error) {
       if (error instanceof z.ZodError) {
-        toast({
-          title: "Validation error",
-          description: error.errors[0]?.message || "Please check your input",
-          type: "error",
-        });
+        alert(`Validation error: ${error.errors[0]?.message || "Please check your input"}`);
+      } else {
+        alert(error instanceof Error ? error.message : 'Failed to log metric');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleMetricSelect = (metricId: string) => {
-    const metric = metrics.find(m => m.id === metricId);
+    const metric = metrics.find((m: any) => m.id === metricId);
     if (metric) {
       setFormData(prev => ({
         ...prev,
         metricId,
-        unit: metric.defaultUnit || "",
+        unit: metric.unit || "",
       }));
+      setSearchQuery(metric.name);
     }
   };
 
@@ -231,40 +236,117 @@ export default function MetricsLog({ user }: Props) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Metric *
               </label>
+              {isLoadingMetrics && (
+                <div className="mb-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                  Loading metrics...
+                </div>
+              )}
+              {metricsError && (
+                <div className="mb-2 p-3 bg-red-50 rounded-lg text-sm text-red-700 border border-red-200">
+                  <div className="font-semibold mb-1">Error loading metrics</div>
+                  <div className="text-xs text-red-600">
+                    {metricsError.message || 'Unknown error occurred. Please refresh the page.'}
+                  </div>
+                  {process.env.NODE_ENV === 'development' && (
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer text-red-500">Show error details</summary>
+                      <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto text-xs">
+                        {JSON.stringify(metricsError, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              )}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search metrics..."
+                  placeholder={isLoadingMetrics ? "Loading metrics..." : "Type to search metrics (e.g., 'bench', 'squat')..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isLoadingMetrics}
+                  className={`w-full pl-10 ${searchQuery ? 'pr-10' : 'pr-4'} py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    !formData.metricId && searchQuery === "" ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  } ${isLoadingMetrics ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
+                {searchQuery && !isLoadingMetrics && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFormData(prev => ({ ...prev, metricId: "" }));
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
               </div>
+              {!formData.metricId && searchQuery === "" && !isLoadingMetrics && (
+                <p className="mt-1 text-sm text-red-600">Please search and select a metric to continue</p>
+              )}
+              {searchQuery && !isLoadingMetrics && (
+                <p className="mt-1 text-sm text-gray-500">
+                  {filteredMetrics.length > 0 
+                    ? `Found ${filteredMetrics.length} metric${filteredMetrics.length !== 1 ? 's' : ''}` 
+                    : searchQuery.length > 0 
+                    ? `No metrics found. Try a different search term. (Total metrics: ${metrics.length})` 
+                    : 'Start typing to search...'}
+                </p>
+              )}
+              
+              {/* Debug info in development */}
+              {process.env.NODE_ENV === 'development' && !isLoadingMetrics && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Debug: {metrics.length} metrics loaded, search: "{searchQuery}", filtered: {filteredMetrics.length}
+                </p>
+              )}
               
               {/* Metric Options */}
-              {searchQuery && (
-                <div className="mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
-                  {filteredMetrics.map((metric) => (
-                    <button
-                      key={metric.id}
-                      type="button"
-                      onClick={() => handleMetricSelect(metric.id)}
-                      className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                        formData.metricId === metric.id ? 'bg-blue-50 border-blue-200' : ''
-                      }`}
-                    >
-                      <div className="font-medium text-gray-900">{metric.name}</div>
-                      <div className="text-sm text-gray-500">{metric.category}</div>
-                    </button>
-                  ))}
+              {searchQuery.trim().length > 0 && !isLoadingMetrics && (
+                <div className="mt-2 max-h-60 overflow-y-auto border border-gray-300 rounded-lg shadow-lg bg-white relative z-50">
+                  {filteredMetrics.length > 0 ? (
+                    <div className="divide-y divide-gray-200">
+                      {filteredMetrics.map((metric: any) => (
+                        <button
+                          key={metric.id}
+                          type="button"
+                          onClick={() => handleMetricSelect(metric.id)}
+                          className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors ${
+                            formData.metricId === metric.id ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+                          }`}
+                        >
+                          <div className="font-medium text-gray-900">{metric.name || 'Unnamed Metric'}</div>
+                          {metric.group && (
+                            <div className="text-sm text-gray-500 mt-1">{metric.group}</div>
+                          )}
+                          {metric.unit && !metric.group && (
+                            <div className="text-sm text-gray-500 mt-1">Unit: {metric.unit}</div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-6 text-sm text-gray-500 text-center">
+                      <div className="mb-2">No metrics found matching "{searchQuery}"</div>
+                      <div className="text-xs text-gray-400">
+                        Try searching for: bench, squat, deadlift, etc.
+                      </div>
+                      {metrics.length === 0 && (
+                        <div className="mt-3 text-xs text-red-500 font-medium">
+                          ⚠️ No metrics available in database. Please check your database connection.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               
               {formData.metricId && (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-sm text-blue-800">
-                    Selected: <span className="font-medium">{metrics.find(m => m.id === formData.metricId)?.name}</span>
+                    <span className="font-semibold">Selected:</span> <span className="font-medium">{metrics.find((m: any) => m.id === formData.metricId)?.name}</span>
                   </div>
                 </div>
               )}
@@ -358,23 +440,38 @@ export default function MetricsLog({ user }: Props) {
             )}
 
             {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting || !formData.metricId || formData.value <= 0}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              {isSubmitting ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Logging Metric...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  Log Metric
-                </div>
+            <div>
+              <button
+                type="submit"
+                disabled={isSubmitting || !formData.metricId || formData.value <= 0}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                title={
+                  !formData.metricId 
+                    ? "Please select a metric first" 
+                    : formData.value <= 0 
+                    ? "Please enter a value greater than 0" 
+                    : ""
+                }
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Logging Metric...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Log Metric
+                  </div>
+                )}
+              </button>
+              {(!formData.metricId || formData.value <= 0) && (
+                <p className="mt-2 text-sm text-center text-gray-600">
+                  {!formData.metricId && "⚠️ Select a metric to enable logging"}
+                  {formData.metricId && formData.value <= 0 && "⚠️ Enter a value greater than 0"}
+                </p>
               )}
-            </button>
+            </div>
           </form>
         </motion.div>
 

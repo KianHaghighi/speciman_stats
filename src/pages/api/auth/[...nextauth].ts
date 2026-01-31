@@ -5,6 +5,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import AppleProvider from 'next-auth/providers/apple';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { prisma } from '@/utils/prisma';
+import bcrypt from 'bcrypt';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -47,19 +48,17 @@ export const authOptions: NextAuthOptions = {
             });
           }
 
-          if (!user) {
+          if (!user || !user.password) {
             return null;
           }
 
-          // For now, we'll use a simple password check
-          // In production, you'd want to store hashed passwords
-          if (credentials.password === 'admin123' && user.email === process.env.ADMIN_EMAIL) {
-            return user;
+          // Verify password with bcrypt
+          const isValid = await bcrypt.compare(credentials.password, user.password);
+          if (!isValid) {
+            return null;
           }
 
-          // For other users, we'll need to implement proper password hashing
-          // For now, return null to force OAuth usage
-          return null;
+          return user;
         } catch (error) {
           console.error('Credentials auth error:', error);
           return null;

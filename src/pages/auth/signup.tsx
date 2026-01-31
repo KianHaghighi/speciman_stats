@@ -71,15 +71,31 @@ export default function Signup() {
     }
 
     try {
-      // For now, we'll just show success and redirect to login
-      // In a real app, you'd create the user account here
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.displayName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed');
+      }
+
       setSuccess('Account created successfully! Redirecting to login...');
       
       setTimeout(() => {
         router.push('/auth/login');
       }, 2000);
-    } catch {
-      setError('An error occurred. Please try again.');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Registration failed');
     } finally {
       setIsLoading(false);
     }

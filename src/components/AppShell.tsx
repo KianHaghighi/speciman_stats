@@ -14,7 +14,7 @@ export default function AppShell({ children, showBottomNav = true, className = '
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
       <Navbar />
       
       <motion.main

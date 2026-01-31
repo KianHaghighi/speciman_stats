@@ -14,6 +14,7 @@ export default function Login() {
   const router = useRouter();
   const { error } = router.query;
   const [mounted, setMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -31,6 +32,32 @@ export default function Login() {
     const { error: _error, ...rest } = query;
     router.replace({ pathname, query: rest }, undefined, { shallow: true });
   }
+
+  const handleCredentialsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const result = await signIn('credentials', {
+        identifier: email,
+        password,
+        callbackUrl: '/dashboard',
+        redirect: true,
+      });
+
+      if (result?.error) {
+        console.error('Sign in error:', result.error);
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -135,6 +162,7 @@ export default function Login() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="space-y-4"
+          onSubmit={handleCredentialsSubmit}
         >
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -169,9 +197,10 @@ export default function Login() {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign in
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
         </motion.form>

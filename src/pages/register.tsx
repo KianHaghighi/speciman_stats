@@ -82,7 +82,7 @@ export default function RegisterPage() {
       }
 
       toast.success('Account created successfully! Please sign in.');
-      router.push('/login');
+      router.push('/auth/login');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Registration failed');
     } finally {
@@ -265,7 +265,7 @@ export default function RegisterPage() {
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Already have an account?{' '}
-              <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+              <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
                 Sign in
               </Link>
             </p>

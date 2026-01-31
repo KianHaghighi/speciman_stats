@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { prisma } from '@/utils/prisma';
-import { recomputeElosForUser } from '@/lib/elo/recompute';
+import { recomputeUserClassElo, recomputeOverallElo } from '@/lib/elo/recompute';
 import { log } from '@/server/logger';
 import { z } from 'zod';
 
@@ -34,10 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { metricId, value, notes } = parsed.data;
 
-    // Verify metric exists
+    // Verify metric exists and get class info
     const metric = await prisma.metric.findUnique({
       where: { id: metricId },
-      select: { id: true, name: true }
+      select: { id: true, name: true, classId: true }
     });
 
     if (!metric) {
@@ -54,35 +54,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Recompute ELOs
-    const eloResult = await recomputeElosForUser(userId);
+    // Recompute ELOs for the affected class and overall
+    try {
+      const classEloResult = await recomputeUserClassElo(userId, metric.classId);
+      const overallEloResult = await recomputeOverallElo(userId);
 
-    if (eloResult && 'classes' in eloResult) {
-      // Check if any class ELO increased for animation triggers
-      const hasImprovement = eloResult.classes.some((_, index) => {
-        const existing = eloResult.classes[index];
-        return existing && existing.elo > 1000; // Base ELO
-      });
+      const hasImprovement = classEloResult.change > 0;
 
       log.info('Metric entry added successfully', {
         userId,
         metricId,
         value,
-        hasImprovement
+        hasImprovement,
+        classEloChange: classEloResult.change,
+        overallEloChange: overallEloResult.change
       });
 
       return res.status(200).json({
         success: true,
         message: 'Entry added successfully',
-        eloUpdate: eloResult,
+        eloUpdate: {
+          class: classEloResult,
+          overall: overallEloResult
+        },
         hasImprovement
       });
+    } catch (eloError) {
+      // Log ELO error but don't fail the request
+      log.error('Failed to recompute ELO', { 
+        error: (eloError as Error).message,
+        userId,
+        metricId
+      });
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Entry added successfully (ELO recomputation pending)'
+      });
     }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Entry added successfully'
-    });
 
   } catch (error) {
     log.error('Failed to add metric entry', { 

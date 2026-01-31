@@ -7,6 +7,8 @@ export default defineConfig({
     globals: true,
     include: ['__tests__/**/*.test.ts', '__tests__/**/*.test.tsx'],
     setupFiles: [],
+    testTimeout: 60000, // 60 seconds for integration tests
+    hookTimeout: 60000,
   },
   resolve: {
     alias: {

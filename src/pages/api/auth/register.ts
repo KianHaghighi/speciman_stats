@@ -3,7 +3,6 @@ import { prisma } from '@/utils/prisma';
 import { logger } from '@/utils/logger';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -37,14 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email,
         password: hashedPassword,
         name,
-        eloTitan: 1500,
-        eloBeast: 1500,
-        eloBodyweight: 1500,
-        eloSuperAthlete: 1500,
-        eloHunterGatherer: 1500,
-        eloTotal: 1500,
-        tier: 'Bronze',
-      } as Prisma.UserUncheckedCreateInput,
+        overallElo: 1000,
+      },
     });
 
     logger.authEvent('user_registered', user.id, { email, provider: 'credentials' });
@@ -65,7 +58,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Registration error', error as Error);
+    
+    // In development, show more details
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Registration Error Details:', error);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        details: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+    }
+    
     res.status(500).json({ error: 'Internal server error' });
   }
 } 
