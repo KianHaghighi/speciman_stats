@@ -43,14 +43,13 @@ export function AddMetricModal({ isOpen, onClose }: AddMetricModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !unit.trim() || !category.trim()) {
+    if (!name.trim() || !unit.trim()) {
       setError('Please fill in all fields');
       return;
     }
     addMetric.mutate({ 
       name: name.trim(), 
-      unit: unit.trim(), 
-      category: category.trim() 
+      unit: unit.trim(),
     });
   };
 
