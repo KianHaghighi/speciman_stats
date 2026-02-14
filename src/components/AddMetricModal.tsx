@@ -125,9 +125,9 @@ export function AddMetricModal({ isOpen, onClose }: AddMetricModalProps) {
                   <button
                     type="submit"
                     className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    disabled={addMetric.status === 'pending'}
+                    disabled={addMetric.status === 'loading'}
                   >
-                    {addMetric.status === 'pending' ? 'Adding...' : 'Add Metric'}
+                    {addMetric.status === 'loading' ? 'Adding...' : 'Add Metric'}
                   </button>
                 </div>
               </form>
