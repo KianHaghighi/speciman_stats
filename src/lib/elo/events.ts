@@ -18,12 +18,12 @@ export interface EloEventData {
 export interface EloEvent {
   id: string;
   userId: string;
-  classId?: string;
+  classId?: string | null;
   eventType: string;
   oldValue: number;
   newValue: number;
   change: number;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | string | null;
   createdAt: Date;
 }
 
@@ -185,8 +185,8 @@ export async function getUserEloStats(
         createdAt: { gte: cutoffDate },
       },
       select: {
-        change: number,
-        eventType: string,
+        change: true,
+        eventType: true,
       },
     });
 
@@ -273,7 +273,7 @@ export async function getEloLeaderboardChanges(
       },
       select: {
         userId: true,
-        change: number,
+        change: true,
         user: {
           select: {
             displayName: true,
