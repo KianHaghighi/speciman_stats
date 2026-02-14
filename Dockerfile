@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies for better caching
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # Rebuild the source code only when needed
 FROM node:20-alpine AS builder
