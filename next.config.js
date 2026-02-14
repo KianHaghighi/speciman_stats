@@ -6,7 +6,12 @@ const nextConfig = {
   compress: true,
   generateEtags: false,
   output: 'standalone',
-  
+
+  // Ignore ESLint errors during builds (lint separately in CI)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // Security headers
   async headers() {
     return [
