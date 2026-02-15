@@ -222,9 +222,11 @@ export const userRouter = t.router({
     }))
     .mutation(async ({ input, ctx }) => {
       try {
+        // Extract only fields that exist in the User schema
+        const { heightCm: _h, weightKg: _w, bmi: _b, class: _c, sex: _s, age: _a, ...prismaData } = input;
         const updatedUser = await prisma.user.update({
           where: { id: ctx.session!.user.id },
-          data: input,
+          data: prismaData,
         });
         
         logger.dbEvent('update', 'user', { operation: 'updateProfile', userId: ctx.session!.user.id });
