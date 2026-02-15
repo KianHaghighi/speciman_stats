@@ -244,20 +244,20 @@ async function getUserProfile(userId: string): Promise<UserProfile> {
     select: {
       gender: true,
       dateOfBirth: true,
-      heightCm: true,
-      weightKg: true,
     },
   });
   
-  if (!user || !user.dateOfBirth || !user.heightCm || !user.weightKg) {
+  if (!user || !user.dateOfBirth) {
     throw new Error(`Incomplete profile for user ${userId}`);
   }
   
+  // heightCm and weightKg are not yet in the User schema — use defaults
+  // TODO: Add heightCm and weightKg fields to the User model
   return {
     sexAtBirth: user.gender as 'MALE' | 'FEMALE' | 'OTHER',
     dateOfBirth: user.dateOfBirth,
-    heightCm: user.heightCm,
-    weightKg: user.weightKg,
+    heightCm: 170,
+    weightKg: 75,
   };
 }
 
@@ -402,7 +402,7 @@ async function getFilteredPopulationData(
       createdAt: { gte: cutoffDate },
       user: {
         gender: userProfile.sexAtBirth,
-        weightKg: { gte: minWeight, lte: maxWeight },
+        // TODO: Add weightKg to User schema to enable bodyweight filtering
         dateOfBirth: { not: null },
       },
     },
@@ -541,7 +541,7 @@ export async function batchRecomputeElos(
     try {
       if (classId) {
         // Recompute specific class
-        const result = await recomputeUserClassElo(userId, classId, options);
+        const result = await recomputeUserClassElo(userId, classId, _options);
         results.push(result);
       } else {
         // Recompute all classes for user
@@ -551,7 +551,7 @@ export async function batchRecomputeElos(
         });
         
         for (const userClassElo of userClassElos) {
-          const result = await recomputeUserClassElo(userId, userClassElo.classId, options);
+          const result = await recomputeUserClassElo(userId, userClassElo.classId, _options);
           results.push(result);
         }
       }
